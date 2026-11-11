@@ -1,0 +1,276 @@
+{
+  "name": "AI Inventory Management - Supabase Stock Check & Reorder",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ai-inventory-check",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "0f5a7d2b-1f12-4a30-9d1a-001",
+      "name": "Inventory Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "webhookId": "a1-inventory-check-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body ?? $json;\nconst product_id = body.product_id;\nconst requested_quantity = Number(body.requested_quantity);\nconst reorder_buffer = Number(body.reorder_buffer ?? 0);\n\nif (!product_id || !Number.isInteger(requested_quantity) || requested_quantity <= 0) {\n  throw new Error('Invalid request. Provide product_id and a positive integer requested_quantity.');\n}\nif (!Number.isInteger(reorder_buffer) || reorder_buffer < 0) {\n  throw new Error('reorder_buffer must be a non-negative integer.');\n}\n\nreturn [{ json: { product_id: String(product_id), requested_quantity, reorder_buffer, request_id: body.request_id ?? null, requested_at: new Date().toISOString() } }];"
+      },
+      "id": "0f5a7d2b-1f12-4a30-9d1a-002",
+      "name": "Validate Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.SUPABASE_URL}}/rest/v1/products?select=product_id,product_name,brand,model,stock_quantity,price,primary_supplier_id&product_id=eq.{{$json.product_id}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "0f5a7d2b-1f12-4a30-9d1a-003",
+      "name": "Get Product Stock from Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        700,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const req = $('Validate Request').first().json;\nconst response = $json;\nconst rows = Array.isArray(response) ? response : (Array.isArray(response.body) ? response.body : (response.data ?? []));\nif (!Array.isArray(rows) || rows.length === 0) {\n  return [{ json: { ...req, found: false, error: 'Product not found in Supabase.', status: 'product_not_found', current_stock: null, shortage_quantity: null, reorder_recommendation: null } }];\n}\nconst product = rows[0];\nconst current_stock = Number(product.stock_quantity ?? 0);\nconst available_after_request = current_stock - req.requested_quantity;\nconst shortage_quantity = Math.max(0, req.requested_quantity - current_stock);\nconst stock_sufficient = shortage_quantity === 0;\nconst recommended_reorder_quantity = shortage_quantity > 0 ? shortage_quantity + req.reorder_buffer : 0;\nreturn [{ json: {\n  ...req,\n  found: true,\n  product_id: product.product_id,\n  product_name: product.product_name,\n  brand: product.brand,\n  model: product.model,\n  current_stock,\n  requested_quantity: req.requested_quantity,\n  available_after_request: Math.max(0, available_after_request),\n  shortage_quantity,\n  stock_sufficient,\n  status: stock_sufficient ? 'stock_available' : 'stock_shortage',\n  reorder_recommendation: stock_sufficient ? null : {\n    recommended_quantity: recommended_reorder_quantity,\n    reason: `Requested ${req.requested_quantity}, but only ${current_stock} are in stock. Shortage: ${shortage_quantity}.`,\n    supplier_id: product.primary_supplier_id ?? null\n  },\n  analyzed_at: new Date().toISOString()\n} }];"
+      },
+      "id": "0f5a7d2b-1f12-4a30-9d1a-004",
+      "name": "Compare Stock & Recommend",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        950,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "result-found-condition",
+              "leftValue": "={{$json.found}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "0f5a7d2b-1f12-4a30-9d1a-005",
+      "name": "Product Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1190,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.SUPABASE_URL}}/rest/v1/ai_inventory_analysis_results",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { product_id: $json.product_id, request_id: $json.request_id, requested_quantity: $json.requested_quantity, current_stock: $json.current_stock, shortage_quantity: $json.shortage_quantity, stock_sufficient: $json.stock_sufficient, recommended_reorder_quantity: $json.reorder_recommendation ? $json.reorder_recommendation.recommended_quantity : 0, result_status: $json.status, analysis: $json, created_at: $json.analyzed_at } }}",
+        "options": {}
+      },
+      "id": "0f5a7d2b-1f12-4a30-9d1a-006",
+      "name": "Save Analysis to Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1440,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $('Compare Stock & Recommend').first().json }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "0f5a7d2b-1f12-4a30-9d1a-007",
+      "name": "Return Success JSON",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1680,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $('Compare Stock & Recommend').first().json }}",
+        "options": {
+          "responseCode": 404
+        }
+      },
+      "id": "0f5a7d2b-1f12-4a30-9d1a-008",
+      "name": "Return Product Not Found",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1440,
+        430
+      ]
+    }
+  ],
+  "connections": {
+    "Inventory Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Request": {
+      "main": [
+        [
+          {
+            "node": "Get Product Stock from Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Product Stock from Supabase": {
+      "main": [
+        [
+          {
+            "node": "Compare Stock & Recommend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compare Stock & Recommend": {
+      "main": [
+        [
+          {
+            "node": "Product Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Product Found?": {
+      "main": [
+        [
+          {
+            "node": "Save Analysis to Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Product Not Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Analysis to Supabase": {
+      "main": [
+        [
+          {
+            "node": "Return Success JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

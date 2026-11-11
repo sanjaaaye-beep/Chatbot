@@ -1,0 +1,254 @@
+{% extends "base.html" %}
+{% block title %}LaptopCare | Inventory Overview{% endblock %}
+{% block content %}
+<style>
+  :root { --ink:#1d2522; --muted:#737e79; --paper:#f2f4f2; --line:#dfe5e1; --green:#896500; --green-dark:#202522; --mint:#fff4c9; --lime:#f3d650; --yellow:#f0c735; --amber:#a96b27; --amber-bg:#fbf0df; --red:#b75043; --red-bg:#faece8; }
+  * { box-sizing:border-box; }
+  body { margin:0; color:var(--ink); background:var(--paper); font-family:"DM Sans",sans-serif; }
+  a { color:inherit; }
+  .app { min-height:100vh; display:grid; grid-template-columns:minmax(0,1fr); grid-template-rows:auto minmax(0,1fr); }
+  .side { display:flex; flex-direction:row; align-items:center; gap:8px; padding:0 clamp(16px,4vw,58px); color:var(--ink); background:#fff; border-bottom:1px solid var(--line); }
+  .brand { display:flex; align-items:center; gap:10px; margin:0 42px 0 0; text-decoration:none; }
+  .brand-mark { width:33px; height:33px; display:grid; place-items:center; border-radius:8px; color:#25220f; background:var(--lime); font-weight:800; }
+  .brand-name { font:800 14px Manrope,sans-serif; }
+  .nav-label { display:none; }
+  .nav-link { position:relative; display:flex; align-items:center; gap:8px; min-height:64px; margin:0 3px; padding:0 12px; color:#68736e; font-size:11px; text-decoration:none; }
+  .nav-link:hover,.nav-link.active { color:var(--ink); background:transparent; }
+  .nav-link.active::after { position:absolute; right:12px; bottom:0; left:12px; height:3px; border-radius:3px 3px 0 0; background:var(--green); content:""; }
+  .nav-icon { width:17px; color:var(--green); text-align:center; }
+  .side-note { margin:0 0 0 auto; padding:0 0 0 18px; border:0; border-left:1px solid var(--line); color:var(--muted); font-size:9px; line-height:1.5; }
+  .main { min-width:0; }
+  .topbar { height:48px; display:flex; align-items:center; justify-content:space-between; padding:0 clamp(16px,4vw,58px); border-bottom:1px solid var(--line); background:#f9faf9; }
+  .crumb { color:var(--muted); font-size:11px; }
+  .top-actions { display:flex; align-items:center; gap:16px; }
+  .sample-label { display:flex; align-items:center; gap:7px; color:#8f5b27; font:500 9px "DM Mono",monospace; text-transform:uppercase; }
+  .sample-dot { width:7px; height:7px; border-radius:50%; background:#d89b49; }
+  .avatar { width:29px; height:29px; display:grid; place-items:center; border:1px solid #eadb9d; border-radius:8px; color:#765900; background:#fff8dc; font-size:10px; font-weight:700; }
+  .content { width:min(1500px,100%); margin:0 auto; padding:31px clamp(16px,4vw,58px) 42px; background-image:radial-gradient(#d9dfdb 0.6px,transparent 0.6px); background-size:20px 20px; }
+  .page-head { display:flex; align-items:flex-end; justify-content:space-between; gap:16px; margin-bottom:22px; }
+  .eyebrow { margin:0 0 8px; color:var(--green); font:500 9px "DM Mono",monospace; text-transform:uppercase; }
+  h1 { margin:0; font:800 31px Manrope,sans-serif; letter-spacing:0; }
+  .subhead { margin:5px 0 0; color:var(--muted); font-size:11px; }
+  .button { min-height:35px; display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:0 13px; border:1px solid #d9dfdc; border-radius:5px; color:var(--ink); background:#fff; font:600 10px "DM Sans",sans-serif; text-decoration:none; cursor:pointer; }
+  .button.primary { border-color:#d0aa16; color:#24200f; background:var(--lime); box-shadow:0 3px 0 #c6a51a; }
+  .button:hover { filter:brightness(.97); }
+  .sample-banner { display:flex; align-items:center; gap:10px; margin-bottom:16px; padding:10px 13px; border:1px solid #ead4a6; border-radius:5px; color:#755622; background:#fff9e9; font-size:10px; line-height:1.45; }
+  .sample-banner strong { font-weight:700; }
+  .metrics { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:11px; margin-bottom:13px; }
+  .metric { min-width:0; padding:16px 17px 14px; border:1px solid var(--line); border-radius:5px; background:#fff; box-shadow:0 2px 0 rgba(29,37,34,.025); }
+  .metric-top { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .metric-label { color:var(--muted); font-size:10px; }
+  .metric-icon { width:26px; height:26px; display:grid; place-items:center; border-radius:6px; color:var(--green); background:var(--mint); font-size:12px; }
+  .metric-value { margin:14px 0 4px; font:800 27px Manrope,sans-serif; letter-spacing:0; }
+  .metric-foot { color:var(--muted); font-size:9px; }
+  .up { color:#287851; font-weight:700; }
+  .warn { color:var(--amber); font-weight:700; }
+  .upper-grid { display:grid; grid-template-columns:minmax(0,1.7fr) minmax(260px,.9fr); gap:13px; margin-bottom:13px; }
+  .panel { min-width:0; border:1px solid var(--line); border-radius:5px; background:#fff; box-shadow:0 2px 0 rgba(29,37,34,.025); }
+  .panel-head { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:15px 17px 11px; }
+  .panel-title { margin:0; font:700 12px Manrope,sans-serif; }
+  .panel-meta { margin:4px 0 0; color:var(--muted); font-size:9px; }
+  .legend { display:flex; align-items:center; gap:12px; color:var(--muted); font-size:9px; }
+  .legend span { display:flex; align-items:center; gap:5px; }
+  .legend i { width:7px; height:7px; border-radius:2px; background:var(--yellow); }
+  .legend .out i { background:#75a7a0; }
+  .chart { height:174px; display:flex; align-items:stretch; gap:8px; padding:10px 17px 0; border-bottom:1px solid var(--line); background:repeating-linear-gradient(to bottom,transparent 0,transparent 41px,#eef1ed 42px); }
+  .chart-day { flex:1; min-width:0; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; gap:8px; }
+  .bars { height:138px; display:flex; align-items:flex-end; gap:4px; }
+  .bar { width:12px; max-width:2.2vw; min-height:4px; border-radius:3px 3px 0 0; background:var(--yellow); }
+  .bar.out { background:#75a7a0; }
+  .chart-label { padding-bottom:8px; color:#849089; font:9px "DM Mono",monospace; }
+  .chart-footer { display:flex; justify-content:space-between; padding:9px 17px 12px; color:var(--muted); font-size:9px; }
+  .alerts { padding:0 16px 14px; }
+  .alert-row { display:grid; grid-template-columns:8px minmax(0,1fr) auto; align-items:center; gap:10px; padding:12px 0; border-top:1px solid #edf0ec; }
+  .alert-mark { width:7px; height:7px; border-radius:50%; background:#d88357; }
+  .alert-name { overflow:hidden; font-size:10px; font-weight:700; text-overflow:ellipsis; white-space:nowrap; }
+  .alert-sku { margin-top:3px; color:var(--muted); font:9px "DM Mono",monospace; }
+  .alert-stock { color:var(--red); font:700 10px "DM Mono",monospace; white-space:nowrap; }
+  .alert-footer { margin-top:2px; padding-top:10px; border-top:1px solid #edf0ec; text-align:right; }
+  .text-link { color:var(--green); font-size:9px; font-weight:700; text-decoration:none; }
+  .lower-grid { display:grid; grid-template-columns:minmax(0,1.55fr) minmax(260px,.9fr); gap:13px; }
+  .table-tools { display:flex; align-items:center; gap:7px; }
+  .search { width:180px; height:31px; padding:0 10px; border:1px solid var(--line); border-radius:4px; outline:0; font:10px "DM Sans",sans-serif; }
+  .search:focus { border-color:#8aa8f4; }
+  .category-filter { height:31px; padding:0 24px 0 9px; border:1px solid var(--line); border-radius:4px; color:var(--ink); background:#fff; font:10px "DM Sans",sans-serif; }
+  .table-toolbar { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:0 12px 10px; }
+  .stock-filters { display:flex; align-items:center; gap:4px; }
+  .filter-button { min-height:27px; padding:0 9px; border:1px solid transparent; border-radius:4px; color:var(--muted); background:transparent; font:600 9px "DM Sans",sans-serif; cursor:pointer; }
+  .filter-button:hover { color:var(--ink); background:#f4f6f2; }
+  .filter-button.active { border-color:#eadb9d; color:#765900; background:#fff8dc; }
+  .product-count { color:var(--muted); font:9px "DM Mono",monospace; white-space:nowrap; }
+  .sort-button { padding:0; border:0; color:inherit; background:none; font:inherit; text-transform:inherit; cursor:pointer; }
+  .sort-button:hover { color:var(--green); }
+  .table-wrap { overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; text-align:left; }
+  th { padding:9px 12px; border-top:1px solid #edf0ec; color:#849089; font:500 8px "DM Mono",monospace; text-transform:uppercase; white-space:nowrap; }
+  td { padding:11px 12px; border-top:1px solid #edf0ec; font-size:9px; white-space:nowrap; }
+  .product-name { font-weight:700; }
+  .sku { display:block; margin-top:3px; color:var(--muted); font:8px "DM Mono",monospace; }
+  .stock-cell { min-width:112px; }
+  .stock-number { display:flex; justify-content:space-between; gap:8px; margin-bottom:5px; font:9px "DM Mono",monospace; }
+  .track { height:4px; overflow:hidden; border-radius:4px; background:#edf1ec; }
+  .fill { height:100%; border-radius:inherit; background:#75a7a0; }
+  .fill.low { background:#d4543d; }
+  .status { display:inline-flex; align-items:center; gap:5px; padding:4px 7px; border-radius:3px; font-size:8px; font-weight:700; }
+  .status.good { color:#28704f; background:#eaf4ec; }
+  .status.low { color:#a24d3d; background:var(--red-bg); }
+  .activity { padding:0 16px 12px; }
+  .activity-row { display:grid; grid-template-columns:25px minmax(0,1fr) auto; align-items:start; gap:9px; padding:12px 0; border-top:1px solid #edf0ec; }
+  .activity-icon { width:24px; height:24px; display:grid; place-items:center; border-radius:6px; color:var(--green); background:var(--mint); font-size:10px; }
+  .activity-icon.alert { color:var(--red); background:var(--red-bg); }
+  .activity-title { font-size:9px; font-weight:700; }
+  .activity-detail { margin-top:3px; color:var(--muted); font-size:8px; }
+  .activity-time { color:var(--muted); font-size:8px; white-space:nowrap; }
+  .assistant-strip { display:flex; align-items:center; justify-content:space-between; gap:14px; margin-top:13px; padding:14px 16px; border:1px solid #eadb9d; border-radius:5px; background:#fff8dc; }
+  .assistant-copy strong { display:block; font:700 10px Manrope,sans-serif; }
+  .assistant-copy span { display:block; margin-top:3px; color:var(--muted); font-size:9px; }
+  @media(max-width:1000px) { .side { padding-right:20px; padding-left:20px; } .metrics { grid-template-columns:repeat(2,minmax(0,1fr)); } .upper-grid,.lower-grid { grid-template-columns:1fr; } }
+  @media(max-width:650px) {
+    .app { grid-template-columns:1fr; }
+    .side { flex-wrap:wrap; gap:3px; padding:7px 10px 0; }
+    .brand { margin:0 auto 0 2px; }
+    .nav-label,.side-note,.nav-link .link-text { display:none; }
+    .nav-link { min-height:39px; margin:0; padding:0 10px; }
+    .nav-link.active::after { right:8px; left:8px; }
+    .topbar { height:46px; padding:0 14px; }
+    .content { padding:22px 13px 28px; }
+    .page-head { align-items:flex-start; }
+    h1 { font-size:25px; }
+    .page-head .button { padding:0 9px; font-size:9px; }
+    .metrics { gap:8px; }
+    .metric { padding:13px; }
+    .metric-value { font-size:22px; }
+    .upper-grid,.lower-grid { gap:9px; }
+    .panel-head { padding:13px 12px 10px; flex-wrap:wrap; }
+    .chart { padding-right:10px; padding-left:10px; }
+    .chart-footer { padding-right:12px; padding-left:12px; }
+    .table-tools { flex-wrap:wrap; }
+    .search { width:min(38vw,155px); }
+    .category-filter { max-width:110px; }
+    .table-toolbar { align-items:flex-start; flex-direction:column; }
+    th,td { padding-right:9px; padding-left:9px; }
+  }
+</style>
+<div class="app">
+  <aside class="side" aria-label="Main navigation">
+    <a class="brand" href="{% url 'dashboard' %}"><span class="brand-mark">L</span><span class="brand-name">LaptopCare</span></a>
+    <p class="nav-label">Workspace</p>
+    <a class="nav-link active" href="{% url 'dashboard' %}" aria-current="page" aria-label="Overview"><span class="nav-icon">▦</span><span class="link-text">Overview</span></a>
+    <a class="nav-link" href="#inventory" aria-label="Inventory"><span class="nav-icon">▤</span><span class="link-text">Inventory</span></a>
+    <a class="nav-link" href="#activity" aria-label="Operations"><span class="nav-icon">↗</span><span class="link-text">Operations</span></a>
+    <a class="nav-link" href="{% url 'chat' %}" aria-label="Assistant"><span class="nav-icon">✳</span><span class="link-text">Assistant</span></a>
+    <div class="side-note">LaptopCare Operations<br>Inventory workspace</div>
+  </aside>
+  <main class="main">
+    <header class="topbar">
+      <div class="crumb">Workspace&nbsp; / &nbsp;Overview</div>
+      <div class="top-actions"><span class="sample-label {% if data_state == 'live' %}is-live{% elif data_state == 'error' %}has-error{% endif %}"><i class="sample-dot"></i>{% if data_state == 'live' %}Live data{% elif data_state == 'error' %}Demo fallback{% else %}Sample data{% endif %}</span><span class="avatar" aria-label="Operations user">OP</span></div>
+    </header>
+    <div class="content">
+      <section class="page-head">
+        <div><p class="eyebrow">Operations / Inventory</p><h1>Inventory overview</h1><p class="subhead">A clear read on stock, movement, and replenishment.</p></div>
+        <a class="button primary" href="{% url 'chat' %}">✳&nbsp; Ask assistant</a>
+      </section>
+      <div class="sample-banner {% if data_state == 'live' %}live-banner{% elif data_state == 'error' %}error-banner{% endif %}"><strong>{% if data_state == 'live' %}Live workspace{% elif data_state == 'error' %}Connection issue{% else %}Demo workspace{% endif %}</strong><span>{{ data_notice }}</span></div>
+      <section class="metrics" aria-label="Inventory summary">
+        <article class="metric"><div class="metric-top"><span class="metric-label">Inventory value</span><span class="metric-icon">$</span></div><div class="metric-value">{{ inventory_value }}</div><div class="metric-foot">Current cost value of on-hand stock</div></article>
+        <article class="metric"><div class="metric-top"><span class="metric-label">Active products</span><span class="metric-icon">▤</span></div><div class="metric-value">{{ active_products }}</div><div class="metric-foot">Active SKUs in the catalog</div></article>
+        <article class="metric"><div class="metric-top"><span class="metric-label">Below reorder point</span><span class="metric-icon" style="color:var(--amber);background:var(--amber-bg)">!</span></div><div class="metric-value">{{ products_to_reorder }}</div><div class="metric-foot"><span class="warn">Needs attention</span> at minimum stock</div></article>
+        <article class="metric"><div class="metric-top"><span class="metric-label">Open orders</span><span class="metric-icon">↗</span></div><div class="metric-value">{{ open_orders }}</div><div class="metric-foot">Pending, confirmed, or processing</div></article>
+      </section>
+      <section class="upper-grid">
+        <article class="panel">
+          <div class="panel-head"><div><h2 class="panel-title">Stock movement</h2><p class="panel-meta">Units received and dispatched · last 7 days</p></div><div class="legend"><span><i></i>Received</span><span class="out"><i></i>Dispatched</span></div></div>
+          <div class="chart" role="img" aria-label="Bar chart comparing units received and dispatched each day for the last seven days">
+            {% for day in movement %}<div class="chart-day"><div class="bars"><span class="bar" style="height:{{ day.received }}%" title="{{ day.received }} received"></span><span class="bar out" style="height:{{ day.dispatched }}%" title="{{ day.dispatched }} dispatched"></span></div><span class="chart-label">{{ day.day }}</span></div>{% endfor %}
+          </div>
+          <div class="chart-footer"><span>Inbound stock</span><strong>{{ inbound_total }} units</strong><span>Outbound stock</span><strong>{{ outbound_total }} units</strong></div>
+        </article>
+        <article class="panel">
+          <div class="panel-head"><div><h2 class="panel-title">Reorder attention</h2><p class="panel-meta">Items at or below minimum stock</p></div><span class="status low">{{ products_to_reorder }} items</span></div>
+          <div class="alerts">
+            {% for alert in reorder_alerts %}<div class="alert-row"><i class="alert-mark"></i><div><div class="alert-name">{{ alert.name }}</div><div class="alert-sku">{{ alert.sku }} · min. {{ alert.minimum }}</div></div><strong class="alert-stock">{{ alert.stock }} left</strong></div>{% empty %}<p class="panel-meta">No products are below their reorder point.</p>{% endfor %}
+            <div class="alert-footer"><a class="text-link" href="#inventory" data-show-reorder>Review inventory&nbsp; →</a></div>
+          </div>
+        </article>
+      </section>
+      <section class="lower-grid">
+        <article class="panel" id="inventory">
+          <div class="panel-head"><div><h2 class="panel-title">Product inventory</h2><p class="panel-meta">Stock on hand against reorder minimum</p></div><div class="table-tools"><input class="search" id="product-search" type="search" placeholder="Search products..." aria-label="Search products"><select class="category-filter" id="category-filter" aria-label="Filter by category"><option value="all">All categories</option><option value="laptops">Laptops</option><option value="accessories">Accessories</option><option value="storage">Storage</option><option value="monitors">Monitors</option></select><button class="button" id="export-csv" type="button">↓&nbsp; Export</button></div></div>
+          <div class="table-toolbar"><div class="stock-filters" role="group" aria-label="Filter by stock status"><button class="filter-button active" type="button" data-stock-filter="all" aria-pressed="true">All stock</button><button class="filter-button" type="button" data-stock-filter="reorder" aria-pressed="false">Reorder</button><button class="filter-button" type="button" data-stock-filter="healthy" aria-pressed="false">Healthy</button></div><span class="product-count" id="product-count" aria-live="polite"></span></div>
+          <div class="table-wrap"><table><thead><tr><th>Product</th><th>Category</th><th><button class="sort-button" id="sort-stock" type="button" aria-label="Sort products by stock">On hand ↕</button></th><th>Status</th></tr></thead><tbody id="product-rows">
+            {% for product in products %}<tr data-product-row data-name="{{ product.name }}" data-sku="{{ product.sku }}" data-category="{{ product.category|lower }}" data-status="{{ product.status|lower }}" data-stock="{{ product.stock }}" data-minimum="{{ product.minimum }}"><td><span class="product-name">{{ product.name }}</span><span class="sku">{{ product.sku }}</span></td><td>{{ product.category }}</td><td class="stock-cell"><div class="stock-number"><span>{{ product.stock }} units</span><span>min {{ product.minimum }}</span></div><div class="track"><div class="fill {% if product.status == 'Reorder' %}low{% endif %}" style="width:{{ product.stock }}%"></div></div></td><td>{% if product.status == 'Reorder' %}<span class="status low">Reorder</span>{% else %}<span class="status good">Healthy</span>{% endif %}</td></tr>{% endfor %}
+          </tbody></table></div>
+        </article>
+        <article class="panel" id="activity">
+          <div class="panel-head"><div><h2 class="panel-title">Recent activity</h2><p class="panel-meta">Latest warehouse events</p></div><a class="text-link" href="#activity">View all</a></div>
+          <div class="activity">{% for item in activity %}<div class="activity-row"><span class="activity-icon {% if item.kind == 'alert' %}alert{% endif %}">{% if item.kind == 'received' %}↓{% elif item.kind == 'order' %}↗{% else %}!{% endif %}</span><div><div class="activity-title">{{ item.title }}</div><div class="activity-detail">{{ item.detail }}</div></div><span class="activity-time">{{ item.time }}</span></div>{% empty %}<p class="panel-meta">No inventory movement recorded yet.</p>{% endfor %}</div>
+        </article>
+      </section>
+      <div class="assistant-strip"><div class="assistant-copy"><strong>Need a quick operational answer?</strong><span>The assistant can explain setup and the inventory workflow.</span></div><a class="button" href="{% url 'chat' %}">Open assistant&nbsp; →</a></div>
+    </div>
+  </main>
+</div>
+<script>
+  const search = document.getElementById("product-search");
+  const categoryFilter = document.getElementById("category-filter");
+  const productRows = [...document.querySelectorAll("[data-product-row]")];
+  const productCount = document.getElementById("product-count");
+  let selectedStatus = "all";
+  let ascendingStock = true;
+
+  function applyFilters() {
+    const query = search.value.trim().toLocaleLowerCase();
+    const category = categoryFilter.value;
+    let visibleCount = 0;
+    productRows.forEach(row => {
+      const matches = row.textContent.toLocaleLowerCase().includes(query)
+        && (category === "all" || row.dataset.category === category)
+        && (selectedStatus === "all" || row.dataset.status === selectedStatus);
+      row.hidden = !matches;
+      if (matches) visibleCount += 1;
+    });
+    productCount.textContent = `Showing ${visibleCount} of ${productRows.length} products`;
+  }
+
+  search.addEventListener("input", applyFilters);
+  categoryFilter.addEventListener("change", applyFilters);
+  document.querySelectorAll("[data-stock-filter]").forEach(button => {
+    button.addEventListener("click", () => {
+      selectedStatus = button.dataset.stockFilter;
+      document.querySelectorAll("[data-stock-filter]").forEach(filter => {
+        const active = filter === button;
+        filter.classList.toggle("active", active);
+        filter.setAttribute("aria-pressed", String(active));
+      });
+      applyFilters();
+    });
+  });
+  document.getElementById("sort-stock").addEventListener("click", event => {
+    ascendingStock = !ascendingStock;
+    productRows.sort((left, right) => (Number(left.dataset.stock) - Number(right.dataset.stock)) * (ascendingStock ? 1 : -1));
+    productRows.forEach(row => document.getElementById("product-rows").append(row));
+    event.currentTarget.textContent = ascendingStock ? "On hand ↑" : "On hand ↓";
+  });
+  document.getElementById("export-csv").addEventListener("click", () => {
+    const csvValue = value => `"${String(value).replaceAll('"', '""')}"`;
+    const visibleRows = productRows.filter(row => !row.hidden);
+    const lines = [["Product", "SKU", "Category", "On hand", "Reorder point", "Status"], ...visibleRows.map(row => [row.dataset.name, row.dataset.sku, row.dataset.category, row.dataset.stock, row.dataset.minimum, row.dataset.status])];
+    const file = new Blob([lines.map(line => line.map(csvValue).join(",")).join("\r\n")], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(file);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "laptopcare-inventory-demo.csv";
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
+  document.querySelector("[data-show-reorder]").addEventListener("click", () => {
+    document.querySelector('[data-stock-filter="reorder"]').click();
+  });
+  applyFilters();
+</script>
+{% endblock %}
